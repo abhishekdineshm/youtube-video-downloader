@@ -14,16 +14,17 @@ QUALITY_MAP = {
     "4": ("4K", "bestvideo[height<=2160]+bestaudio/best"),
 }
 
-progress = {"status": "idle", "percent": 0, "filename": ""}
+progress = {"status": "idle", "percent": "0%", "filename": ""}
 
 def progress_hook(d):
     """Updates the global progress variable to track download progress."""
+    global progress
     if d["status"] == "downloading":
         progress["status"] = "downloading"
         progress["percent"] = d.get("_percent_str", "0%").strip()
     elif d["status"] == "finished":
         progress["status"] = "finished"
-        progress["filename"] = d["filename"]
+        progress["filename"] = d.get("filename", "")
 
 @app.route("/", methods=["GET"])
 def index():
@@ -34,8 +35,9 @@ def download():
     global progress
     url = request.json["url"]
     quality = request.json["quality"]
-    
+
     progress = {"status": "downloading", "percent": "0%", "filename": ""}
+    
     quality_name, format_choice = QUALITY_MAP.get(quality, ("best", "best"))
     output_template = os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s")
 
@@ -46,10 +48,18 @@ def download():
         "progress_hooks": [progress_hook],
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            final_filename = ydl.prepare_filename(info_dict)
 
-    return jsonify({"status": "completed", "filename": progress["filename"]})
+            progress["status"] = "finished"
+            progress["filename"] = os.path.abspath(final_filename)
+
+        return jsonify({"status": "completed", "filename": progress["filename"]})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route("/progress", methods=["GET"])
 def get_progress():
