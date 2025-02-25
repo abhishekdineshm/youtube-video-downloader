@@ -51,6 +51,7 @@ def download():
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
+                "cookies_from_browser": ["chrome", "opera", "edge", "firefox"],
                 "preferedformat": "mp4",
             }
         ],
