@@ -45,6 +45,7 @@ def download():
         "outtmpl": output_template,
         "format": format_choice,
         "merge_output_format": "mp4",
+        "cookiefile": "cookies.txt",
         "progress_hooks": [progress_hook],
     }
 
