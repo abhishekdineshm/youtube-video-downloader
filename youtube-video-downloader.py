@@ -1,4 +1,6 @@
 import yt_dlp
+import os
+import subprocess
 
 # Mapping option numbers to quality settings
 QUALITY_MAP = {
@@ -8,12 +10,27 @@ QUALITY_MAP = {
     "4": ("4K", "bestvideo[height<=2160]+bestaudio/best")
 }
 
+def open_download_folder(path):
+    """Opens the download folder where the video is saved."""
+    if os.name == "nt":  # Windows
+        subprocess.run(["explorer", path], shell=True)
+    elif os.uname().sysname == "Darwin":  # macOS
+        subprocess.run(["open", path])
+    else:  # Linux
+        subprocess.run(["xdg-open", path])
+
 def download_video(url, quality_option, output_path="downloads"):
-    """Downloads YouTube video in the selected quality."""
+    """Downloads YouTube video in the selected quality and opens the folder."""
     quality_name, format_choice = QUALITY_MAP.get(quality_option, ("best", "best"))
 
+    # Ensure the download directory exists
+    os.makedirs(output_path, exist_ok=True)
+
+    # Define output template
+    output_template = os.path.join(output_path, "%(title)s.%(ext)s")
+
     ydl_opts = {
-        "outtmpl": f"{output_path}/%(title)s.%(ext)s",
+        "outtmpl": output_template,
         "format": format_choice,
         "merge_output_format": "mp4",
     }
@@ -21,8 +38,15 @@ def download_video(url, quality_option, output_path="downloads"):
     print(f"\nDownloading in {quality_name}... Please wait!")
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    
+
     print("\nDownload Complete! ✅")
+
+    # Convert folder path to absolute and open it
+    abs_folder_path = os.path.abspath(output_path)
+    print(f"\n📂 Your videos are saved in: {abs_folder_path}")
+
+    # Open the folder containing the videos
+    open_download_folder(abs_folder_path)
 
 if __name__ == "__main__":
     video_url = input("\nEnter YouTube Video URL: ")
