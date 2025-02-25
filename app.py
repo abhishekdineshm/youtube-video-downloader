@@ -1,6 +1,8 @@
 from flask import Flask, request, render_template, jsonify, send_file
 import yt_dlp
 import os
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -26,16 +28,9 @@ def progress_hook(d):
         progress["status"] = "finished"
         progress["filename"] = d.get("filename", "")
 
-@app.route("/", methods=["GET"])
-def index():
-    return render_template("index.html")
-
-@app.route("/download", methods=["POST"])
-def download():
+def download_video(url, quality):
+    """Runs the video download in a background thread."""
     global progress
-    url = request.json["url"]
-    quality = request.json["quality"]
-
     progress = {"status": "downloading", "percent": "0%", "filename": ""}
     
     quality_name, format_choice = QUALITY_MAP.get(quality, ("best", "best"))
@@ -55,11 +50,25 @@ def download():
 
             progress["status"] = "finished"
             progress["filename"] = os.path.abspath(final_filename)
-
-        return jsonify({"status": "completed", "filename": progress["filename"]})
-
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        progress["status"] = "error"
+        progress["percent"] = "0%"
+        progress["filename"] = str(e)
+
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
+
+@app.route("/download", methods=["POST"])
+def start_download():
+    url = request.json["url"]
+    quality = request.json["quality"]
+    
+    # Start the download in a background thread
+    thread = threading.Thread(target=download_video, args=(url, quality))
+    thread.start()
+
+    return jsonify({"status": "started"})
 
 @app.route("/progress", methods=["GET"])
 def get_progress():
