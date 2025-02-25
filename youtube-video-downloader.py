@@ -1,65 +1,75 @@
+from flask import Flask, request, render_template, jsonify, send_file
 import yt_dlp
 import os
-import subprocess
 
-# Mapping option numbers to quality settings
+app = Flask(__name__)
+
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
 QUALITY_MAP = {
     "1": ("720p", "bestvideo[height<=720]+bestaudio/best"),
     "2": ("1080p", "bestvideo[height<=1080]+bestaudio/best"),
     "3": ("2K", "bestvideo[height<=1440]+bestaudio/best"),
-    "4": ("4K", "bestvideo[height<=2160]+bestaudio/best")
+    "4": ("4K", "bestvideo[height<=2160]+bestaudio/best"),
 }
 
-def open_download_folder(path):
-    """Opens the download folder where the video is saved."""
-    if os.name == "nt":  # Windows
-        subprocess.run(["explorer", path], shell=True)
-    elif os.uname().sysname == "Darwin":  # macOS
-        subprocess.run(["open", path])
-    else:  # Linux
-        subprocess.run(["xdg-open", path])
+progress = {"status": "idle", "percent": "0%", "filename": ""}
 
-def download_video(url, quality_option, output_path="downloads"):
-    """Downloads YouTube video in the selected quality and opens the folder."""
-    quality_name, format_choice = QUALITY_MAP.get(quality_option, ("best", "best"))
+def progress_hook(d):
+    """Updates the global progress variable to track download progress."""
+    global progress
+    if d["status"] == "downloading":
+        progress["status"] = "downloading"
+        progress["percent"] = d.get("_percent_str", "0%").strip()
+    elif d["status"] == "finished":
+        progress["status"] = "finished"
+        progress["filename"] = d.get("filename", "")
 
-    # Ensure the download directory exists
-    os.makedirs(output_path, exist_ok=True)
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
 
-    # Define output template
-    output_template = os.path.join(output_path, "%(title)s.%(ext)s")
+@app.route("/download", methods=["POST"])
+def download():
+    global progress
+    url = request.json["url"]
+    quality = request.json["quality"]
+
+    progress = {"status": "downloading", "percent": "0%", "filename": ""}
+    
+    quality_name, format_choice = QUALITY_MAP.get(quality, ("best", "best"))
+    output_template = os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s")
 
     ydl_opts = {
         "outtmpl": output_template,
         "format": format_choice,
         "merge_output_format": "mp4",
+        "progress_hooks": [progress_hook],
     }
 
-    print(f"\nDownloading in {quality_name}... Please wait!")
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            final_filename = ydl.prepare_filename(info_dict)
 
-    print("\nDownload Complete! ✅")
+            progress["status"] = "finished"
+            progress["filename"] = os.path.abspath(final_filename)
 
-    # Convert folder path to absolute and open it
-    abs_folder_path = os.path.abspath(output_path)
-    print(f"\n📂 Your videos are saved in: {abs_folder_path}")
+        return jsonify({"status": "completed", "filename": progress["filename"]})
 
-    # Open the folder containing the videos
-    open_download_folder(abs_folder_path)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route("/progress", methods=["GET"])
+def get_progress():
+    return jsonify(progress)
+
+@app.route("/download_file", methods=["GET"])
+def download_file():
+    if progress["status"] == "finished" and progress["filename"]:
+        return send_file(progress["filename"], as_attachment=True)
+    return "No file available", 404
 
 if __name__ == "__main__":
-    video_url = input("\nEnter YouTube Video URL: ")
-
-    print("\nSelect Video Quality:")
-    print("1️⃣  720p")
-    print("2️⃣  1080p")
-    print("3️⃣  2K")
-    print("4️⃣  4K")
-
-    quality_choice = input("\nEnter your choice (1-4): ").strip()
-
-    if quality_choice in QUALITY_MAP:
-        download_video(video_url, quality_choice)
-    else:
-        print("\n❌ Invalid choice! Please enter a number between 1 and 4.")
+    app.run(debug=True)
