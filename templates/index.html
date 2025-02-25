@@ -62,20 +62,16 @@
             transition: width 0.3s ease-in-out;
         }
 
-        #download-link {
+        #status-message {
             display: none;
             font-size: 18px;
-            background: #00ff99;
-            color: black;
-            padding: 10px;
-            text-decoration: none;
-            border-radius: 5px;
+            color: #00ff99;
             margin-top: 10px;
-            transition: 0.3s;
         }
 
-        #download-link:hover {
-            background: #00cc77;
+        #restart-button {
+            display: none;
+            margin-top: 10px;
         }
     </style>
 
@@ -85,8 +81,9 @@
             let quality = document.getElementById("quality").value;
             let progressBar = document.getElementById("progress-bar");
             let progressDiv = document.getElementById("progress");
-            let downloadButton = document.getElementById("download-link");
-            
+            let statusMessage = document.getElementById("status-message");
+            let restartButton = document.getElementById("restart-button");
+
             if (!url) {
                 alert("Please enter a YouTube URL!");
                 return;
@@ -94,7 +91,8 @@
 
             progressDiv.style.display = "block";
             progressBar.style.width = "0%";
-            downloadButton.style.display = "none";
+            statusMessage.style.display = "none";
+            restartButton.style.display = "none";
 
             fetch("/download", {
                 method: "POST",
@@ -111,19 +109,23 @@
                         setTimeout(checkProgress, 1000);
                     } else if (data.status === "finished") {
                         progressBar.style.width = "100%";
-                        downloadButton.href = "/download_file";
-                        downloadButton.style.display = "inline-block";
-                        downloadButton.innerText = "Download File";
+                        statusMessage.innerText = "Download completed successfully.";
+                        statusMessage.style.display = "block";
+                        restartButton.style.display = "inline-block";
                     }
                 });
             }
 
             checkProgress();
         }
+
+        function restartDownload() {
+            location.reload();
+        }
     </script>
 </head>
 <body>
-    <h2>YouTube Video Downloader </h2>
+    <h2>YouTube Video Downloader</h2>
     <input type="text" id="url" placeholder="Enter YouTube URL">
     <br>
     <select id="quality">
@@ -139,6 +141,7 @@
         <div id="progress-bar"></div>
     </div>
     
-    <a id="download-link" href="#" download></a>
+    <p id="status-message"></p>
+    <button id="restart-button" onclick="restartDownload()">Download another video</button>
 </body>
 </html>
