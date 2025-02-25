@@ -16,22 +16,27 @@ QUALITY_MAP = {
     "4": ("4K", "bestvideo[height<=2160]+bestaudio/best"),
 }
 
+# Global variable to track progress
 progress = {"status": "idle", "percent": "0%", "filename": ""}
 
 def progress_hook(d):
     """Updates the global progress variable to track download progress."""
     global progress
+    print(f"DEBUG: Progress Hook Called - {d}")  # Debugging output
+    
     if d["status"] == "downloading":
         progress["status"] = "downloading"
         progress["percent"] = d.get("_percent_str", "0%").strip()
+        print(f"DEBUG: Downloading - {progress['percent']}")  # Debugging
     elif d["status"] == "finished":
         progress["status"] = "finished"
         progress["filename"] = d.get("filename", "")
+        print(f"DEBUG: Download Finished - {progress['filename']}")  # Debugging
 
 def download_video(url, quality):
     """Runs the video download in a background thread."""
     global progress
-    progress = {"status": "downloading", "percent": "0%", "filename": ""}
+    progress = {"status": "starting", "percent": "0%", "filename": ""}
     
     quality_name, format_choice = QUALITY_MAP.get(quality, ("best", "best"))
     output_template = os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s")
@@ -40,7 +45,7 @@ def download_video(url, quality):
         "outtmpl": output_template,
         "format": format_choice,
         "merge_output_format": "mp4",
-        "progress_hooks": [progress_hook],
+        "progress_hooks": [progress_hook],  # Ensure progress_hook is called
     }
 
     try:
@@ -50,10 +55,12 @@ def download_video(url, quality):
 
             progress["status"] = "finished"
             progress["filename"] = os.path.abspath(final_filename)
+            print(f"DEBUG: Final filename - {progress['filename']}")  # Debugging
     except Exception as e:
         progress["status"] = "error"
         progress["percent"] = "0%"
         progress["filename"] = str(e)
+        print(f"DEBUG: Error - {e}")  # Debugging
 
 @app.route("/", methods=["GET"])
 def index():
@@ -63,6 +70,8 @@ def index():
 def start_download():
     url = request.json["url"]
     quality = request.json["quality"]
+    
+    print(f"DEBUG: Received Download Request - URL: {url}, Quality: {quality}")  # Debugging
     
     # Start the download in a background thread
     thread = threading.Thread(target=download_video, args=(url, quality))
