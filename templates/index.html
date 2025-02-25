@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <style>
+        /* Dark Mode Styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #00ff99;
+        }
+
+        input, select, button {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+        }
+
+        input, select {
+            background: #333;
+            color: #fff;
+            width: 300px;
+        }
+
+        button {
+            background-color: #00ff99;
+            color: black;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #00cc77;
+        }
+
+        #progress {
+            width: 100%;
+            max-width: 400px;
+            height: 25px;
+            background: #333;
+            border-radius: 5px;
+            margin: 20px auto;
+            display: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #00ff99;
+            transition: width 0.3s ease-in-out;
+        }
+
+        #download-link {
+            display: none;
+            font-size: 18px;
+            background: #00ff99;
+            color: black;
+            padding: 10px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+
+        #download-link:hover {
+            background: #00cc77;
+        }
+    </style>
+
+    <script>
+        function startDownload() {
+            let url = document.getElementById("url").value;
+            let quality = document.getElementById("quality").value;
+            let progressBar = document.getElementById("progress-bar");
+            let progressDiv = document.getElementById("progress");
+            let downloadButton = document.getElementById("download-link");
+            
+            if (!url) {
+                alert("Please enter a YouTube URL!");
+                return;
+            }
+
+            progressDiv.style.display = "block";
+            progressBar.style.width = "0%";
+            downloadButton.style.display = "none";
+
+            fetch("/download", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: url, quality: quality })
+            });
+
+            function checkProgress() {
+                fetch("/progress")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "downloading") {
+                        progressBar.style.width = data.percent;
+                        setTimeout(checkProgress, 1000);
+                    } else if (data.status === "finished") {
+                        progressBar.style.width = "100%";
+                        downloadButton.href = "/download_file";
+                        downloadButton.style.display = "inline-block";
+                        downloadButton.innerText = "Download File";
+                    }
+                });
+            }
+
+            checkProgress();
+        }
+    </script>
+</head>
+<body>
+    <h2>🎥 YouTube Video Downloader</h2>
+    <input type="text" id="url" placeholder="Enter YouTube URL">
+    <br>
+    <select id="quality">
+        <option value="1">720p</option>
+        <option value="2">1080p</option>
+        <option value="3">2K</option>
+        <option value="4">4K</option>
+    </select>
+    <br>
+    <button onclick="startDownload()">Start Download</button>
+    
+    <div id="progress">
+        <div id="progress-bar"></div>
+    </div>
+    
+    <a id="download-link" href="#" download></a>
+</body>
+</html>
