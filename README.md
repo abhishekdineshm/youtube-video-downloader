@@ -49,7 +49,7 @@ sudo yum install ffmpeg  # CentOS/RHEL
 
 ### **Run the script**:  
 ```sh
-python youtube_downloader.py
+python youtube-video-downloader.py.py
 ```
 
 ### **Steps:**  
