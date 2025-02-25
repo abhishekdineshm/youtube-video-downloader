@@ -51,11 +51,11 @@ def download():
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
-                "cookies_from_browser": ["chrome", "opera", "edge", "firefox"],
                 "preferedformat": "mp4",
             }
         ],
         "progress_hooks": [progress_hook],
+        "cookies_from_browser": ("chrome", None, None, None),
         "verbose": True,
     }
 
