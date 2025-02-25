@@ -1,8 +1,6 @@
 from flask import Flask, request, render_template, jsonify, send_file
 import yt_dlp
 import os
-import threading
-import time
 
 app = Flask(__name__)
 
@@ -16,28 +14,34 @@ QUALITY_MAP = {
     "4": ("4K", "bestvideo[height<=2160]+bestaudio/best"),
 }
 
-# Global variable to track progress
 progress = {"status": "idle", "percent": "0%", "filename": ""}
 
 def progress_hook(d):
-    """Updates the global progress variable to track download progress."""
+    """Updates progress tracking for download status."""
     global progress
-    print(f"DEBUG: Progress Hook Called - {d}")  # Debugging output
-    
     if d["status"] == "downloading":
         progress["status"] = "downloading"
         progress["percent"] = d.get("_percent_str", "0%").strip()
-        print(f"DEBUG: Downloading - {progress['percent']}")  # Debugging
     elif d["status"] == "finished":
         progress["status"] = "finished"
-        progress["filename"] = d.get("filename", "")
-        print(f"DEBUG: Download Finished - {progress['filename']}")  # Debugging
+        progress["filename"] = d["filename"]
 
-def download_video(url, quality):
-    """Runs the video download in a background thread."""
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
+
+@app.route("/download", methods=["POST"])
+def download():
     global progress
-    progress = {"status": "starting", "percent": "0%", "filename": ""}
-    
+    url = request.json.get("url")
+    quality = request.json.get("quality")
+
+    if not url or not quality:
+        return jsonify({"error": "Missing URL or quality selection"}), 400
+
+    print(f"DEBUG: Received Download Request - URL: {url}, Quality: {quality}")
+
+    progress = {"status": "downloading", "percent": "0%", "filename": ""}
     quality_name, format_choice = QUALITY_MAP.get(quality, ("best", "best"))
     output_template = os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s")
 
@@ -45,39 +49,18 @@ def download_video(url, quality):
         "outtmpl": output_template,
         "format": format_choice,
         "merge_output_format": "mp4",
-        "progress_hooks": [progress_hook],  # Ensure progress_hook is called
+        "progress_hooks": [progress_hook],
+        "cookiefile": "cookies.txt",  # Authentication fix
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            final_filename = ydl.prepare_filename(info_dict)
+            ydl.download([url])
+    except yt_dlp.utils.DownloadError as e:
+        print(f"DEBUG: Error - {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
-            progress["status"] = "finished"
-            progress["filename"] = os.path.abspath(final_filename)
-            print(f"DEBUG: Final filename - {progress['filename']}")  # Debugging
-    except Exception as e:
-        progress["status"] = "error"
-        progress["percent"] = "0%"
-        progress["filename"] = str(e)
-        print(f"DEBUG: Error - {e}")  # Debugging
-
-@app.route("/", methods=["GET"])
-def index():
-    return render_template("index.html")
-
-@app.route("/download", methods=["POST"])
-def start_download():
-    url = request.json["url"]
-    quality = request.json["quality"]
-    
-    print(f"DEBUG: Received Download Request - URL: {url}, Quality: {quality}")  # Debugging
-    
-    # Start the download in a background thread
-    thread = threading.Thread(target=download_video, args=(url, quality))
-    thread.start()
-
-    return jsonify({"status": "started"})
+    return jsonify({"status": "completed", "filename": progress["filename"]})
 
 @app.route("/progress", methods=["GET"])
 def get_progress():
@@ -87,7 +70,7 @@ def get_progress():
 def download_file():
     if progress["status"] == "finished" and progress["filename"]:
         return send_file(progress["filename"], as_attachment=True)
-    return "No file available", 404
+    return jsonify({"error": "No file available"}), 404
 
 if __name__ == "__main__":
     app.run(debug=True)
