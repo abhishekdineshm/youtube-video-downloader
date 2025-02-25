@@ -50,7 +50,7 @@ def download():
         "format": format_choice,
         "merge_output_format": "mp4",
         "progress_hooks": [progress_hook],
-        "cookiefile": "cookies.txt",  # Authentication fix
+        "cookiesfrombrowser": "chrome",  # Use cookies from your Chrome browser
     }
 
     try:
